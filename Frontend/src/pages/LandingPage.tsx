@@ -91,7 +91,7 @@ export function LandingPage() {
       <div className="landing-hero">
         <div className="landing-hero-inner">
           <div className="landing-logo">🛡️</div>
-          <h1 className="landing-title">Welcome to SafeWatch SG</h1>
+          <h1 className="landing-title">Welcome to SafeWatch</h1>
           <p className="landing-sub">
             AI-powered incident detection &amp; real-time public safety advisories.
           </p>
