@@ -22,9 +22,13 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 
-def create_user_document(uid: str, username: str, phone: str, email: str) -> bool:
+RESPONDER_DOMAIN = "@staff.safewatch.sg"
+
+
+def create_user_document(uid: str, username: str, email: str) -> bool:
     """
     Writes a new user document to users/{uid}.
+    Role is assigned by email domain: @staff.safewatch.sg → responder, else public.
     Returns False if the user already exists, True if created.
     """
     user_ref = db.collection("users").document(uid)
@@ -32,13 +36,10 @@ def create_user_document(uid: str, username: str, phone: str, email: str) -> boo
     if user_ref.get().exists:
         return False
 
-    # Determine role at registration time
-    responders = db.collection("responders").where("phone", "==", phone).limit(1).get()
-    role = "responder" if len(responders) > 0 else "public"
+    role = "responder" if email.lower().endswith(RESPONDER_DOMAIN) else "public"
 
     user_ref.set({
         "username": username,
-        "phone": phone,
         "email": email,
         "role": role,
         "createdAt": datetime.utcnow(),
@@ -47,40 +48,14 @@ def create_user_document(uid: str, username: str, phone: str, email: str) -> boo
     return True
 
 
-def get_email_by_identifier(identifier: str) -> str | None:
-    """
-    Looks up a user's email by their username or phone number.
-    Returns the email string, or None if no match found.
-    """
-    # Try username first
-    by_username = db.collection("users").where("username", "==", identifier).limit(1).get()
-    if len(by_username) > 0:
-        return by_username[0].to_dict().get("email")
-
-    # Try phone number
-    by_phone = db.collection("users").where("phone", "==", identifier).limit(1).get()
-    if len(by_phone) > 0:
-        return by_phone[0].to_dict().get("email")
-
-    return None
-
-
 def get_user_role(uid: str) -> str | None:
     """
-    Checks if the user is a responder or public.
-    Returns "responder", "public", or None if user not found.
+    Returns the stored role for a user, or None if the user document doesn't exist.
+    Role is authoritative from the users/{uid} document written at signup.
     """
-    user_ref = db.collection("users").document(uid)
-    user_doc = user_ref.get()
+    user_doc = db.collection("users").document(uid).get()
 
     if not user_doc.exists:
         return None
 
-    phone = user_doc.to_dict().get("phone")
-
-    responders = db.collection("responders").where("phone", "==", phone).limit(1).get()
-
-    if len(responders) > 0:
-        return "responder"
-
-    return "public"
+    return user_doc.to_dict().get("role", "public")
