@@ -2,8 +2,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
+import { auth } from "../firebase";
 import type { Advisory } from "../types/advisory";
 import { TopBar } from "./TopBar";
+import { useLocationTracking } from "../hooks/useLocationTracking";
 
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -14,6 +16,32 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
+
+// Green pulsing dot for "You are here"
+const meIcon = L.divIcon({
+  className: "",
+  html: `<div style="
+    width:16px;height:16px;border-radius:50%;
+    background:#1976d2;border:2.5px solid white;
+    box-shadow:0 0 0 4px rgba(25,118,210,0.25);
+  "></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+// Grey dot for other online users
+const userIcon = L.divIcon({
+  className: "",
+  html: `<div style="
+    width:12px;height:12px;border-radius:50%;
+    background:#555;border:2px solid white;
+    box-shadow:0 1px 4px rgba(0,0,0,0.3);
+  "></div>`,
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
+type LiveUser = { uid: string; lat: number; lng: number };
 
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000;
@@ -28,9 +56,13 @@ function haversineM(lat1: number, lng1: number, lat2: number, lng2: number) {
 
 export function PublicPage() {
   const [advs, setAdvs] = useState<Advisory[]>([]);
-  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+  const [liveUsers, setLiveUsers] = useState<LiveUser[]>([]);
   const [radiusM, setRadiusM] = useState(1500);
 
+  // Live location tracking — writes to Firestore locations/{uid}
+  const me = useLocationTracking();
+
+  // Listen to all published advisories
   useEffect(() => {
     const q1 = query(collection(db, "advisories"), where("published", "==", true));
     const unsub = onSnapshot(q1, (snap) => {
@@ -40,13 +72,16 @@ export function PublicPage() {
     return () => unsub();
   }, []);
 
+  // Listen to all online users' locations from Firestore
   useEffect(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setMe({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setMe(null),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    const unsub = onSnapshot(collection(db, "locations"), (snap) => {
+      const myUid = auth.currentUser?.uid;
+      const users: LiveUser[] = snap.docs
+        .filter((d) => d.id !== myUid)          // exclude self
+        .map((d) => ({ uid: d.id, ...(d.data() as any) }));
+      setLiveUsers(users);
+    });
+    return () => unsub();
   }, []);
 
   const center = useMemo<[number, number]>(() => {
@@ -76,7 +111,12 @@ export function PublicPage() {
               </div>
               <div className="col" style={{ flex: 1 }}>
                 <div className="small">My location</div>
-                <div className="badge">{me ? `${me.lat.toFixed(5)}, ${me.lng.toFixed(5)}` : "Not shared"}</div>
+                <div style={{ fontSize: 12, padding: "4px 8px", border: "1px solid #ddd", borderRadius: 8, display: "inline-block" }}>
+                  {me ? `${me.lat.toFixed(5)}, ${me.lng.toFixed(5)}` : "Acquiring…"}
+                </div>
+                <div className="small" style={{ opacity: 0.6 }}>
+                  {liveUsers.length} other user{liveUsers.length !== 1 ? "s" : ""} online
+                </div>
               </div>
             </div>
 
@@ -108,12 +148,19 @@ export function PublicPage() {
 
                 {me && (
                   <>
-                    <Marker position={[me.lat, me.lng]}>
+                    <Marker position={[me.lat, me.lng]} icon={meIcon}>
                       <Popup>You are here</Popup>
                     </Marker>
-                    <Circle center={[me.lat, me.lng]} radius={radiusM} />
+                    <Circle center={[me.lat, me.lng]} radius={radiusM} color="#1976d2" fillOpacity={0.06} />
                   </>
                 )}
+
+                {/* Other online users */}
+                {liveUsers.map((u) => (
+                  <Marker key={u.uid} position={[u.lat, u.lng]} icon={userIcon}>
+                    <Popup>Another user nearby</Popup>
+                  </Marker>
+                ))}
 
                 {nearby.map((a) => (
                   <React.Fragment key={a.id}>
