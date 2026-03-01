@@ -52,6 +52,9 @@ export function LoginPage() {
             <button className="button">Sign in</button>
             {err && <div style={{ color: "#b00020" }}>{err}</div>}
           </form>
+          <div style={{ marginTop: 12, textAlign: "center" }}>
+            No account? <a href="/register">Register here</a>
+          </div>
         </div>
       </div>
     </>

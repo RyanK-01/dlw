@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./ui/styles.css";
 import { AuthProvider } from "./auth/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 import { PublicPage } from "./pages/PublicPage";
 import { ResponderPage } from "./pages/ResponderPage";
 import { IncidentPage } from "./pages/IncidentPage";
@@ -15,6 +16,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/public" element={<PublicPage />} />
 
           <Route
