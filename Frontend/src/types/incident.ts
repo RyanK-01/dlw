@@ -1,7 +1,6 @@
-
 import type { Timestamp } from "firebase/firestore";
 
-export type IncidentStatus = "NEW" | "TRIAGED" | "CONFIRMED" | "FALSE_ALARM" | "CLOSED";
+export type IncidentStatus = "NEW" | "CONFIRMED" | "FALSE_ALARM" | "CLOSED";
 
 export interface Incident {
   id: string;
@@ -16,5 +15,9 @@ export interface Incident {
 
   // optional for CCTV / live view:
   latestFrameJpeg?: string; // base64 dataURL OR storage URL
-  live?: boolean;
+  previewUrl?: string; // optional: browser-playable link from edge (HLS/WebRTC)
+  metadataLabel?: string; // optional: e.g. "man_with_knife"
+
+  // responders who clicked "I'm responding"
+  responders?: Record<string, boolean>; // { [uid]: true }
 }
