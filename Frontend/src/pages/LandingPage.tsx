@@ -43,7 +43,7 @@ export function LandingPage() {
 
   useEffect(() => {
     if (!loading && user && role) {
-      nav(role === "responder" || role === "admin" ? "/responder" : "/public", { replace: true });
+      nav("/dashboard", { replace: true });
     }
   }, [user, role, loading, nav]);
 
@@ -128,7 +128,7 @@ export function LandingPage() {
         createdAt: serverTimestamp(),
       });
 
-      nav("/public", { replace: true });
+      nav("/dashboard", { replace: true });
     } catch (ex: any) {
       if (ex?.code === "auth/email-already-in-use") {
         setSignupErr("An account with this phone number already exists.");

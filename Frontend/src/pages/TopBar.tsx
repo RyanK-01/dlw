@@ -16,8 +16,7 @@ export function TopBar() {
       </div>
 
       <div className="row">
-        <Link className="badge" to="/public">Public</Link>
-        <Link className="badge" to="/responder">Responder</Link>
+        <Link className="badge" to="/dashboard">Dashboard</Link>
         {!user ? (
           <Link className="button secondary" to="/login">Login</Link>
         ) : (

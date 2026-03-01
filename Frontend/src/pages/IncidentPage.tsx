@@ -89,7 +89,7 @@ export function IncidentPage() {
       <TopBar />
       <div className="container">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <Link className="badge" to="/responder">← Back</Link>
+          <Link className="badge" to="/dashboard">← Back</Link>
           {inc && <span className="badge">Risk {Number(inc.riskScore ?? 0).toFixed(1)}</span>}
         </div>
 
