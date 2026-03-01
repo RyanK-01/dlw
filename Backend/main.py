@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from firebase_admin import firestore
 from pydantic import BaseModel, Field
+from firebase import create_user_document, get_user_role, get_email_by_identifier
 try:
     from .firebase_config import (
         get_db,
@@ -44,6 +45,21 @@ except ImportError:
     )
 
 app = FastAPI(title="DLW CCTV Incident Detection API")
+
+
+def get_allowed_frontend_origins() -> list[str]:
+    """
+    Parse comma-separated frontend origins for CORS.
+    Supports both FRONTEND_ORIGINS (preferred) and ALLOWED_ORIGINS (legacy).
+    Example: FRONTEND_ORIGINS="https://app.example.com,https://admin.example.com"
+    """
+    origins_raw = (
+        os.getenv("FRONTEND_ORIGINS")
+        or os.getenv("ALLOWED_ORIGINS")
+        or "http://localhost:5173,http://127.0.0.1:5173"
+    )
+    origins = [origin.strip().rstrip("/") for origin in origins_raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173"]
 
 
 class AlertAcknowledgeRequest(BaseModel):
@@ -82,7 +98,7 @@ def encode_geohash(latitude: float, longitude: float) -> Optional[str]:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to Vercel frontend domain in production
+    allow_origins=get_allowed_frontend_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
