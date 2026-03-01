@@ -9,6 +9,6 @@ export function RequireRole({ allow, children }: { allow: UserRole[]; children: 
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!role || !allow.includes(role)) return <Navigate to="/dashboard" replace />;
+  if (!role || !allow.includes(role)) return <Navigate to="/public" replace />;
   return <>{children}</>;
 }

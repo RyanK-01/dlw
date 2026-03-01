@@ -50,7 +50,7 @@ export function ResponderPage() {
               {filtered.length === 0 && <div className="small">No incidents.</div>}
 
               {filtered.map((i) => (
-                <Link key={i.id} to={`/responder/incidents/${i.id}`} className="card" style={{ padding: 12 }}>
+                <Link key={i.id} to={`/incidents/${i.id}`} className="card" style={{ padding: 12 }}>
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <b>Incident #{i.id.slice(0, 6)}</b>
                     {chip(i.status)}
@@ -68,10 +68,14 @@ export function ResponderPage() {
           </div>
 
           <div className="card">
-            <h2 style={{ marginTop: 0 }}>Workflow</h2>
+            <h2 style={{ marginTop: 0 }}>Actions</h2>
             <div className="small">
               TRIAGE → view CCTV/latest frame → CONFIRM/FALSE → Publish advisory if confirmed.
             </div>
+            <hr />
+            <Link to="/incidents/new" className="button" style={{ display: "inline-block", textAlign: "center" }}>
+              + Generate Report
+            </Link>
           </div>
         </div>
       </div>
