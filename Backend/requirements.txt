@@ -2,3 +2,4 @@ fastapi
 firebase-admin
 python-dotenv
 pydantic
+openai

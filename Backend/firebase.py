@@ -1,12 +1,14 @@
 import os
 import json
 from datetime import datetime
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
 
-load_dotenv()
+backend_dir = Path(__file__).resolve().parent
+load_dotenv(backend_dir / ".env", override=True)
 
 # On Vercel: read credentials from FIREBASE_CREDENTIALS_JSON env var (full JSON string)
 # Locally: fall back to serviceAccountKey.json file

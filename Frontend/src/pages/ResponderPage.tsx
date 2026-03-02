@@ -21,6 +21,12 @@ function chip(status: string) {
 export function ResponderPage() {
   const [incs, setIncs] = useState<Incident[]>([]);
   const [minRisk, setMinRisk] = useState(0);
+  const [selectedIncidentId, setSelectedIncidentId] = useState("");
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportErr, setReportErr] = useState("");
+  const [reportSuccess, setReportSuccess] = useState("");
+
+  const backendBase = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
   useEffect(() => {
     const q1 = query(collection(db, "incidents"), orderBy("updatedAt", "desc"));
@@ -32,6 +38,59 @@ export function ResponderPage() {
   }, []);
 
   const filtered = useMemo(() => incs.filter((i) => (i.riskScore ?? 0) >= minRisk), [incs, minRisk]);
+  const selectedIncident = useMemo(
+    () => filtered.find((incident) => incident.id === selectedIncidentId) ?? filtered[0] ?? null,
+    [filtered, selectedIncidentId]
+  );
+
+  useEffect(() => {
+    if (!selectedIncident && filtered.length > 0) {
+      setSelectedIncidentId(filtered[0].id);
+      return;
+    }
+    if (selectedIncident && selectedIncident.id !== selectedIncidentId) {
+      setSelectedIncidentId(selectedIncident.id);
+    }
+  }, [filtered, selectedIncident, selectedIncidentId]);
+
+  useEffect(() => {
+    if (!reportSuccess) return;
+    const timer = window.setTimeout(() => setReportSuccess(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [reportSuccess]);
+
+  async function generateReport() {
+    if (!selectedIncident) return;
+
+    setGeneratingReport(true);
+    setReportErr("");
+    setReportSuccess("");
+    try {
+      const res = await fetch(`${backendBase}/api/incidents/${selectedIncident.id}/report/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        throw new Error(errorBody?.detail ?? `Failed with status ${res.status}`);
+      }
+
+      const body = await res.json().catch(() => ({}));
+      const reportId = body?.reportId as string | undefined;
+      if (reportId) {
+        setReportSuccess(`Report generated successfully. Report ID: ${reportId}`);
+      } else {
+        setReportSuccess("Report generated successfully.");
+      }
+    } catch (error: any) {
+      setReportErr(error?.message ?? "Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
 
   return (
     <>
@@ -69,14 +128,84 @@ export function ResponderPage() {
           </div>
 
           <div className="card">
-            <h2 style={{ marginTop: 0 }}>Actions</h2>
+            <h2 style={{ marginTop: 0 }}>Incident Report</h2>
             <div className="small">
-              TRIAGE → view CCTV/latest frame → CONFIRM/FALSE → Publish advisory if confirmed.
+              Generate an LLM-based responder report table for a selected incident.
             </div>
             <hr />
-            <Link to="/incidents/new" className="button" style={{ display: "inline-block", textAlign: "center" }}>
-              + Generate Report
-            </Link>
+
+            <label className="small">Select incident</label>
+            <select
+              className="input"
+              value={selectedIncident?.id ?? ""}
+              onChange={(e) => setSelectedIncidentId(e.target.value)}
+              disabled={filtered.length === 0}
+            >
+              {filtered.map((incident) => (
+                <option key={incident.id} value={incident.id}>
+                  {incident.id.slice(0, 8)} • {incident.status} • Risk {Number(incident.riskScore ?? 0).toFixed(1)}
+                </option>
+              ))}
+            </select>
+
+            <button
+              className="button"
+              onClick={generateReport}
+              disabled={!selectedIncident || generatingReport}
+              style={{ marginTop: 10 }}
+            >
+              {generatingReport ? "Generating..." : "Generate Report (LLM)"}
+            </button>
+
+            {reportSuccess && <div style={{ color: "#0a7d34", marginTop: 10 }}>{reportSuccess}</div>}
+            {reportErr && <div style={{ color: "#b00020", marginTop: 10 }}>{reportErr}</div>}
+
+            {!selectedIncident?.llmReport ? (
+              <div className="small" style={{ marginTop: 10 }}>
+                No report generated yet for this incident.
+              </div>
+            ) : (
+              <>
+                <div className="small" style={{ marginTop: 12 }}>
+                  {selectedIncident.llmReport.model ? `Model: ${selectedIncident.llmReport.model}` : "Model: configured backend default"}
+                </div>
+
+                <div style={{ overflowX: "auto", marginTop: 8 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", borderBottom: "1px solid #e6e6e6", padding: "8px 6px" }}>Field</th>
+                        <th style={{ textAlign: "left", borderBottom: "1px solid #e6e6e6", padding: "8px 6px" }}>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedIncident.llmReport.rows.map((row, idx) => (
+                        <tr key={`${row.field}-${idx}`}>
+                          <td style={{ borderBottom: "1px solid #f1f1f1", padding: "8px 6px", fontWeight: 600 }}>{row.field}</td>
+                          <td style={{ borderBottom: "1px solid #f1f1f1", padding: "8px 6px" }}>{row.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <div className="small" style={{ fontWeight: 700, opacity: 0.9 }}>Summary</div>
+                  <div style={{ marginTop: 4 }}>{selectedIncident.llmReport.summary}</div>
+                </div>
+
+                {!!selectedIncident.llmReport.recommendedActions?.length && (
+                  <div style={{ marginTop: 10 }}>
+                    <div className="small" style={{ fontWeight: 700, opacity: 0.9 }}>Recommended Actions</div>
+                    <ul style={{ marginTop: 6, paddingLeft: 20 }}>
+                      {selectedIncident.llmReport.recommendedActions.map((action, idx) => (
+                        <li key={`${action}-${idx}`}>{action}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

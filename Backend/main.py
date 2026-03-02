@@ -6,6 +6,7 @@ from pydantic import BaseModel, ValidationError
 
 from firebase import create_user_document, db, get_user_role
 from models import CameraHeartbeat, IncidentAlert
+from scripts.generate_incident_report import _build_report, _save_report
 
 app = FastAPI()
 
@@ -24,6 +25,12 @@ class UserCreate(BaseModel):
     uid: str        # Firebase Auth UID
     username: str
     email: str
+
+
+class GenerateIncidentReportResponse(BaseModel):
+    incidentId: str
+    reportId: str
+    model: str
 
 
 # ---------- Routes ----------
@@ -106,3 +113,35 @@ def ingest_camera_heartbeat(camera_id: str, heartbeat: CameraHeartbeat):
         heartbeat.model_dump(mode="json")
     )
     return {"message": "heartbeat received", "camera_id": camera_id}
+
+
+def _generate_incident_report_impl(incident_id: str) -> GenerateIncidentReportResponse:
+    snap = db.collection("incidents").document(incident_id).get()
+    if not snap.exists:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    incident = snap.to_dict() or {}
+
+    try:
+        report, model = _build_report(incident_id, incident)
+        report_id = _save_report(incident_id, incident, report, model)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to generate incident report") from exc
+
+    return GenerateIncidentReportResponse(
+        incidentId=incident_id,
+        reportId=report_id,
+        model=model,
+    )
+
+
+@app.post("/api/incidents/{incident_id}/report/generate", response_model=GenerateIncidentReportResponse)
+def generate_incident_report_post(incident_id: str):
+    return _generate_incident_report_impl(incident_id)
+
+
+@app.get("/api/incidents/{incident_id}/report/generate", response_model=GenerateIncidentReportResponse)
+def generate_incident_report_get(incident_id: str):
+    return _generate_incident_report_impl(incident_id)

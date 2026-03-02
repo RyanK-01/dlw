@@ -1,4 +1,5 @@
 .env*
+!.env.example
 serviceAccountKey*
 __pycache__/
 *.pyc

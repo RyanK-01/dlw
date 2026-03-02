@@ -17,4 +17,12 @@ export interface Incident {
   // optional for CCTV / live view:
   latestFrameJpeg?: string; // base64 dataURL OR storage URL
   live?: boolean;
+
+  llmReport?: {
+    rows: Array<{ field: string; value: string }>;
+    summary: string;
+    recommendedActions: string[];
+    generatedAt?: Timestamp;
+    model?: string;
+  };
 }
