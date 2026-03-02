@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from datetime import datetime, timezone
@@ -15,6 +16,63 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from firebase import db
+
+
+NEIGHBOURHOOD_CENTERS: list[tuple[str, float, float]] = [
+    ("Jurong East", 1.3331, 103.7436),
+    ("Bukit Batok", 1.3496, 103.7520),
+    ("Clementi", 1.3151, 103.7652),
+    ("Queenstown", 1.2942, 103.7876),
+    ("Bukit Timah", 1.3294, 103.8021),
+    ("Orchard", 1.3048, 103.8318),
+    ("Novena", 1.3201, 103.8437),
+    ("Toa Payoh", 1.3343, 103.8519),
+    ("Bishan", 1.3508, 103.8485),
+    ("Ang Mo Kio", 1.3691, 103.8454),
+    ("Yishun", 1.4291, 103.8359),
+    ("Woodlands", 1.4360, 103.7860),
+    ("Sengkang", 1.3919, 103.8955),
+    ("Punggol", 1.4043, 103.9020),
+    ("Serangoon", 1.3521, 103.8738),
+    ("Hougang", 1.3612, 103.8863),
+    ("Tampines", 1.3496, 103.9568),
+    ("Pasir Ris", 1.3730, 103.9493),
+    ("Bedok", 1.3236, 103.9273),
+    ("Geylang", 1.3162, 103.8980),
+    ("Kallang", 1.3090, 103.8660),
+    ("Marina Bay", 1.2760, 103.8546),
+    ("Chinatown", 1.2838, 103.8437),
+    ("Sentosa", 1.2494, 103.8303),
+]
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    radius_km = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(d_lat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(d_lng / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return radius_km * c
+
+
+def _nearest_neighbourhood(lat: float | None, lng: float | None) -> str:
+    if lat is None or lng is None:
+        return "Unknown"
+
+    nearest_name = "Unknown"
+    nearest_distance = float("inf")
+    for name, center_lat, center_lng in NEIGHBOURHOOD_CENTERS:
+        distance = _haversine_km(lat, lng, center_lat, center_lng)
+        if distance < nearest_distance:
+            nearest_distance = distance
+            nearest_name = name
+
+    return nearest_name
 
 
 def _as_float(value: Any) -> float | None:
@@ -89,6 +147,7 @@ def _extract_prompt_fields(incident: dict[str, Any]) -> dict[str, Any]:
         "current_time": current_time,
         "lat": lat,
         "lng": lng,
+        "nearest_neighbourhood": _nearest_neighbourhood(lat, lng),
         "yolo_classes_string": ", ".join(deduped_classes) if deduped_classes else "Unknown",
         "confidence_score": confidence_score,
         "offline_or_online": offline_or_online,
@@ -163,19 +222,21 @@ def _build_report(incident_id: str, incident: dict[str, Any]) -> tuple[dict[str,
         "Your task is to analyze raw detection metadata from a CCTV feed and generate a concise, objective, and highly accurate incident report for police responders.\\n\\n"
         "Rules:\\n\\n"
         "Remain strictly objective. Do not assume intent (e.g., say 'Two individuals observed making physical contact' instead of 'Two people fighting').\\n\\n"
-        "Keep the summary under 3 sentences.\\n\\n"
+        "Keep the summary under 3 sentences and strictly factual.\\n\\n"
+        "For recommended_action, provide 2 to 3 short, actionable responder directives in one string, separated by semicolons, and include key considerations responders should take into account (for example safety perimeter, verification priority, or escalation criteria). Keep tone objective and operational.\\n\\n"
         "You MUST output your response entirely in valid JSON format. Do not include markdown formatting like ```json or any other text outside the JSON object."
     )
 
     user_prompt = (
         "Generate an incident report for the following raw detection data:\\n\\n"
         f"Timestamp: {prompt_fields['current_time']}\\n\\n"
+        f"Nearest neighbourhood: {prompt_fields['nearest_neighbourhood']}\\n\\n"
         f"Location coordinates: {lat_text}, {lng_text}\\n\\n"
         f"AI Detected Classes: {prompt_fields['yolo_classes_string']}\\n\\n"
         f"Maximum Confidence Score: {confidence_text}\\n\\n"
         f"System Status: {prompt_fields['offline_or_online']}\\n\\n"
         "Use the following JSON schema:\\n"
-        "{\"incident_title\": \"Short 3-4 word title\", \"severity_level\": \"Low, Medium, High, or Critical based on classes\", \"objective_summary\": \"Your 3 sentence description of the event\", \"recommended_action\": \"Brief instruction for the responder\"}"
+        "{\"incident_title\": \"Short 3-4 word title\", \"severity_level\": \"Low, Medium, High, or Critical based on classes\", \"objective_summary\": \"Your 3 sentence description of the event\", \"recommended_action\": \"2-3 concise responder actions in one string separated by semicolons, including key considerations to take into account\"}"
     )
 
     try:
@@ -208,6 +269,8 @@ def _build_report(incident_id: str, incident: dict[str, Any]) -> tuple[dict[str,
     severity_level = str(report.get("severity_level", "")).strip()
     objective_summary = str(report.get("objective_summary", "")).strip()
     recommended_action = str(report.get("recommended_action", "")).strip()
+    if recommended_action:
+        recommended_action = " ".join(recommended_action.split())
 
     if not incident_title:
         raise RuntimeError("OpenAI output missing incident_title")
@@ -222,7 +285,8 @@ def _build_report(incident_id: str, incident: dict[str, Any]) -> tuple[dict[str,
         {"field": "Incident Title", "value": incident_title},
         {"field": "Severity Level", "value": severity_level},
         {"field": "Timestamp", "value": str(prompt_fields["current_time"])},
-        {"field": "Location", "value": f"{lat_text}, {lng_text}"},
+        {"field": "Nearest Neighbourhood", "value": str(prompt_fields["nearest_neighbourhood"])},
+        {"field": "Coordinates", "value": f"{lat_text}, {lng_text}"},
         {"field": "AI Detected Classes", "value": str(prompt_fields["yolo_classes_string"])},
         {"field": "Maximum Confidence", "value": confidence_text},
         {"field": "System Status", "value": str(prompt_fields["offline_or_online"])},
