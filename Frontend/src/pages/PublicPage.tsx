@@ -327,13 +327,13 @@ export function PublicPage() {
           <div className="public-grid">
             {/* Left: Information Board */}
             <div className="card info-panel">
-              <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
+              <div className="row info-header-row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
                 <h2 style={{ margin: 0 }}>Information Board</h2>
                 <select 
                   className="input" 
                   value={viewMode}
                   onChange={(e) => setViewMode(e.target.value as any)}
-                  style={{ width: 180 }}
+                  style={{ width: "min(180px, 45vw)" }}
                 >
                   <option value="advisories">Active Advisories</option>
                   <option value="incidents">Incident</option>
@@ -362,7 +362,7 @@ export function PublicPage() {
               ) : (
                 <div className="col">
                   {/* Filters for Incidents */}
-                  <div className="row" style={{ gap: 12, marginBottom: 12 }}>
+                  <div className="row incident-filters" style={{ gap: 12, marginBottom: 12 }}>
                     <select 
                       className="input" 
                       value={incidentFilter}
