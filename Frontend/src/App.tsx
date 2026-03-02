@@ -7,6 +7,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { PublicPage } from "./pages/PublicPage";
 import { ResponderPage } from "./pages/ResponderPage";
 import { IncidentPage } from "./pages/IncidentPage";
+import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { RequireRole } from "./auth/RequireRole";
 
 export default function App() {
@@ -17,21 +18,31 @@ export default function App() {
           <Route path="/login" element={<LandingPage />} />
           <Route path="/register" element={<Navigate to="/login" replace />} />
 
+          {/* Profile Settings */}
+          <Route
+            path="/profile"
+            element={
+              <RequireRole allow={["public", "responder"]}>
+                <ProfileSettingsPage />
+              </RequireRole>
+            }
+          />
+
           {/* Public view — any logged-in user */}
           <Route
             path="/public"
             element={
-              <RequireRole allow={["public", "responder", "admin"]}>
+              <RequireRole allow={["public", "responder"]}>
                 <PublicPage />
               </RequireRole>
             }
           />
 
-          {/* Responder view — responder/admin only */}
+          {/* Responder view — responder only */}
           <Route
             path="/responder"
             element={
-              <RequireRole allow={["responder", "admin"]}>
+              <RequireRole allow={["responder"]}>
                 <ResponderPage />
               </RequireRole>
             }
@@ -40,7 +51,7 @@ export default function App() {
           <Route
             path="/incidents/:id"
             element={
-              <RequireRole allow={["responder", "admin"]}>
+              <RequireRole allow={["responder"]}>
                 <IncidentPage />
               </RequireRole>
             }

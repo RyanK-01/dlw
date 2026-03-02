@@ -3,3 +3,5 @@ firebase-admin
 python-dotenv
 pydantic
 openai
+twilio
+uvicorn
