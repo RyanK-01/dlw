@@ -15,3 +15,7 @@ Unlike traditional surveillance systems that rely on continuous cloud streaming,
 - Offline-friendly architecture
 - Human-in-the-loop decision making
 - Scalable and low-cost deployment
+
+## Registration (role play)
+- use XXX@staff.safewatch.sg to be responder.
+- else use any email for public user.
